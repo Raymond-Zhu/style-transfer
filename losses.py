@@ -42,3 +42,5 @@ def total_loss(content_weight, content_input, style_weight, style_input, stylize
         with tf.name_scope("total_loss"): 
             total_loss = c_loss + s_loss + tv_loss
     return total_loss
+
+#Normalize pixels
