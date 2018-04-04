@@ -17,8 +17,28 @@ def style_loss(style_weight, style_current, style_target):
     shape = style_target.get_shape()
     return style_weight * tf.reduce_mean(gram_matrix(style_current) - gram_matrix(style_target)**2)
 
-def tv_loss(img, weight):
+def total_variation_loss(img, weight):
     tv_h = tf.reduce_sum((img[:,1:,:,:] - img[:,:-1,:,:])**2)
     tv_w = tf.reduce_sum((img[:,:,1:,:] - img[:,:,:-1,:])**2)
     
     return tv_weight * (tv_h + tv_w)
+
+def total_loss(content_weight, content_input, style_weight, style_input, stylized_image, tv_weight, mobile_net):
+    with tf.name_scope("feature_extraction"):    
+        with tf.name_scope("content_features"):
+            content_features = mobile_net(content_input)
+        with tf.name_scope("style_features"):
+            style_features = mobile_net(style_input)
+        with tf.name_scope("style_image_features"):
+            stylized_image_features = mobile_net(stylized_image)
+    
+    with tf.name_scope("losses"):
+        with tf.name_scope("content_loss"):
+            c_loss = content_loss(content_weight, stylized_image_features, content_features)
+        with tf.name_scope("style_loss"):
+            s_loss = style_loss(style_weight, stylized_image_features, style_features)
+        with tf.name_scope("tv_loss"):
+            tv_loss = total_variation_loss(stylized_image, tv_weight)
+        with tf.name_scope("total_loss"): 
+            total_loss = c_loss + s_loss + tv_loss
+    return total_loss
