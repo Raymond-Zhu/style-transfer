@@ -1,6 +1,9 @@
 import argparse
 import tensorflow as tf
+import tensorflow_hub as hub
 import os
+import model
+
 
 parser = argparse.ArgumentParser(description="Style transfer")
 parser.add_argument('-c','--content_image_dir')
@@ -41,7 +44,7 @@ def augment_image(image):
     image = tf.squeeze(image)
     image.set_shape([None, None, 3])
     image = tf.random_crop(image, [height, width, channels])
-    image = tf.image.resize_images(image, [256, 256]) 
+    image = tf.image.resize_images(image, [224, 224]) 
     return image
 
 def main():
@@ -51,13 +54,16 @@ def main():
         content_image_filenames = list(absoluteFilePaths(args.content_image_dir))
         style_image_filenames = list(absoluteFilePaths(args.style_image_dir))
 
+        mobile_net = hub.Module("https://tfhub.dev/google/imagenet/mobilenet_v2_075_224/feature_vector/1")
+
         # content_dataset = tf.data.Dataset.from_tensor_slices((tf.constant(content_image_filenames), tf.constant(content_image_filenames)))
         # content_dataset = content_dataset.shuffle(len(content_image_filenames)) 
         # content_dataset = content_dataset.batch(batch_size)
         # content_dataset = content_dataset.map(read_image, num_parallel_calls=4)
         # content_dataset.prefetch(1)
         # content_iterator = content_dataset.make_one_shot_iterator()
-        
+        # content_batch = content_iterator.get_next()
+
         style_dataset = tf.data.Dataset.from_tensor_slices(style_image_filenames)
         style_dataset = style_dataset.map(read_image, num_parallel_calls=4)
         style_dataset = style_dataset.map(augment_image, num_parallel_calls=4)
@@ -65,13 +71,13 @@ def main():
         style_dataset = style_dataset.batch(batch_size)
         style_dataset.prefetch(1)
         style_iterator = style_dataset.make_one_shot_iterator()
-        batch = style_iterator.get_next() 
+        style_batch = style_iterator.get_next()
         
-        summary = tf.summary.image('style_image_for_train', batch)
-        merged = tf.summary.merge_all()
+        style_pred_network = model.style_prediction_network(style_batch, mobile_net)
         with tf.Session() as sess:
-            writer = tf.summary.FileWriter('./logs', sess.graph)
-            test = sess.run(merged)
-            writer.add_summary(test)
+            sess.run(tf.global_variables_initializer()) 
+            #writer = tf.summary.FileWriter('./logs', sess.graph)
+            test = sess.run(style_pred_network)
+            #writer.add_summary(test)
 main()
 

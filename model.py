@@ -68,22 +68,22 @@ def residual_block(image, kernel_size, name, scope, normalizer_fn, style_params)
 
 def style_prediction_network(inputs, mobile_net):
     features = mobile_net(inputs)
+    print(features.get_shape())
     with tf.name_scope('bottleneck'):
-        bottleneck = tf.reduce_mean(features, axis=[1,2], keep_dims=True)
-        bottleneck = tf.layers.conv2d(bottleneck, 100, [1,1])
+        bottleneck = tf.layers.dense(features, 100)
     
     style_params = {}
     with tf.variable_scope("style_params"):
         for i in range(len(ACTIVATION_DEPTHS)):
             with tf.variable_scope(ACTIVATION_NAMES[i]):
-                beta = tf.layers.conv2d(bottleneck, ACTIVATION_DEPTHS[i],[1,1])
-                gamma = tf.layers.conv2d(bottleneck, ACTIVATION_DEPTHS[i], [1,1])
+                beta = tf.layers.dense(bottleneck, ACTIVATION_DEPTHS[i])
+                gamma = tf.layers.dense(bottleneck, ACTIVATION_DEPTHS[i])
 
                 style_params['{}/beta'.format(ACTIVATION_NAMES[i])] = beta
                 style_params['{}/gamma'.format(ACTIVATION_NAMES[i])] = gamma
     return style_params
 
-def style_transformer_network(inputs, style_params, is_training):
+def style_transformer_network(inputs, style_params):
     with tf.variable_scope('style_transformer'):
         with tf.variable_scope('encode') as scope:
             conv1 = tf.contrib.layers.conv2d(inputs, 32, [9,9], [1,1],
