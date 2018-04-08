@@ -5,7 +5,7 @@ import os
 import model
 import losses
 import tensorflow.contrib.slim as slim
-import tensorflow.contrib.slim.nets.mobilenet.mobilenet_v2
+import mobilenet_v2
 
 parser = argparse.ArgumentParser(description="Style transfer")
 parser.add_argument('-c','--content_image_dir')
