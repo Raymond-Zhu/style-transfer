@@ -1,9 +1,16 @@
 import tensorflow as tf
 
-def content_loss(content_weight, content_current, content_target):
-    shape = content_target.get_shape()
-    content_current = tf.reshape(content_current,[shape[3], shape[2] * shape[1]])
-    content_target = tf.reshape(content_target,[shape[3], shape[2] * shape[1]])
+MOBILENET_STYLE_ENDPOINTS = ["layer_10/output", "layer_11/output", "layer_12/output", "layer_13/output", "layer_14/output"]
+MOBILENET_CONTENT_ENDPOINT = "layer_15/output"
+
+def content_loss(content_weight, stylized_image_endpoints, content_endpoints):
+    content_image = content_endpoints[MOBILENET_CONTENT_ENDPOINT]
+    stylized_image = stylized_image_endpoints[MOBILENET_CONTENT_ENDPOINT]
+    
+    shapes = content_image.get_shape()
+    content_image = tf.reshape(content_image, shapes[1], shapes[2]*shapes[3])
+    stylized_image = tf.reshape(stylized_image, shapes[1], shapes[2]*shapes[3])
+
     return content_weight * tf.reduce_mean((content_current - content_target)**2)
 
 def gram_matrix(features):
@@ -13,9 +20,13 @@ def gram_matrix(features):
     gram /= tf.to_float(shape[1]*shape[2]*shape[3])
     return gram
 
-def style_loss(style_weight, style_current, style_target):
-    shape = style_target.get_shape()
-    return style_weight * tf.reduce_mean(gram_matrix(style_current) - gram_matrix(style_target)**2)
+def style_loss(style_weight, stylized_image_endpoints, style_input_endpoints):
+    total_style_loss = tf.get_variable("total_style_loss", dtype=tf.float32, initializer=tf.zeros_initializer)
+    for i in MOBILENET_STYLE_ENDPOINTS:
+        style_current = stylized_image_endpoints[i]
+        style_target = style_input_endpoints[i]
+        style_loss = style_weight[i] * tf.reduce_mean(gram_matrix(style_current) - gram_matrix(style_target)**2)
+        total_style_loss += style_loss
 
 def total_variation_loss(img, weight):
     tv_h = tf.reduce_sum((img[:,1:,:,:] - img[:,:-1,:,:])**2)
@@ -23,24 +34,15 @@ def total_variation_loss(img, weight):
     
     return tv_weight * (tv_h + tv_w)
 
-def total_loss(content_weight, content_input, style_weight, style_input, stylized_image, tv_weight, mobile_net):
-    with tf.name_scope("feature_extraction"):    
-        with tf.name_scope("content_features"):
-            content_features = mobile_net(content_input)
-        with tf.name_scope("style_features"):
-            style_features = mobile_net(style_input)
-        with tf.name_scope("style_image_features"):
-            stylized_image_features = mobile_net(stylized_image)
+def total_loss(content_weight, content_endpoints, style_weight, style_input_endpoitns, stylized_image_endpoints, tv_weight):
     
     with tf.name_scope("losses"):
         with tf.name_scope("content_loss"):
-            c_loss = content_loss(content_weight, stylized_image_features, content_features)
+            c_loss = content_loss(content_weight, stylized_image_endpoints, content_endpoints)
         with tf.name_scope("style_loss"):
-            s_loss = style_loss(style_weight, stylized_image_features, style_features)
+            s_loss = style_loss(style_weight, stylized_image_endpoints, style_input_endpoints)
         with tf.name_scope("tv_loss"):
             tv_loss = total_variation_loss(stylized_image, tv_weight)
         with tf.name_scope("total_loss"): 
             total_loss = c_loss + s_loss + tv_loss
     return total_loss
-
-#Normalize pixels
